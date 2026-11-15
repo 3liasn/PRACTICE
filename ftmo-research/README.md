@@ -62,6 +62,20 @@ Estrategia hipotética con media de 5 % al mes, colas gordas; probabilidad de pe
 
 Lo mejor validado aquí tiene Sharpe ≈ 0,9–1,1 fuera de muestra. Hace falta 3–4.
 
+## Revisión independiente
+
+Un agente revisor distinto del autor reejecutó `sG_portfolio.py` y `sH_verify.py`, reimplementó la reversión IBS
+desde el parquet y escribió su propio simulador. Confirmó las cifras de arriba y no encontró sesgo de anticipación.
+Sus observaciones, todas a favor de la estrategia (es decir, la realidad sería peor):
+
+- El simulador recorta cada día en −4 % con ejecución perfecta, así que la regla de pérdida diaria del 5 % nunca
+  salta. Sin ese corte, la quiebra a 12 meses sube de 23 % a 63 % con Sharpe 3 y de 3,6 % a 24 % con Sharpe 4.
+- Los pagos simulados son brutos; con el reparto del 80 % serían un 20 % menores.
+- La cartera B se destacó después de ver el OOS; su 0,94 tiene un error estándar de ~0,36.
+- Con costes al doble, el Sharpe OOS de la reversión baja a 0,93 (US100), 0,49 (US500) y 0,42 (US2000).
+- De las 176 series exploradas, el mejor Sharpe OOS individual es 1,08. Eligiendo a posteriori, la cartera llega
+  a 1,6–2,0, todavía por debajo de 3–4.
+
 ## Reproducir
 
 ```bash
