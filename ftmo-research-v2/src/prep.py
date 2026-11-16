@@ -1,4 +1,4 @@
-"""Convierte HistData (EST fija = UTC-5, sin horario de verano) y Binance (UTC) a parquet M1 en UTC.
+"""Convierte HistData (hora de Nueva York CON horario de verano: verificado correlando con el oro del servidor FTMO) y Binance (UTC) a parquet M1 en UTC.
 Fuentes: histdata.com (descarga gratuita ASCII M1) y data.binance.vision (klines spot 1m)."""
 import glob, zipfile, io, os, sys
 import pandas as pd, numpy as np
@@ -11,8 +11,9 @@ def hist(pair):
         d = pd.read_csv(z.open(name), sep=";", header=None, names=["t", "open", "high", "low", "close", "volume"])
         dfs.append(d)
     df = pd.concat(dfs, ignore_index=True)
-    df["time"] = pd.to_datetime(df.t, format="%Y%m%d %H%M%S") + pd.Timedelta(hours=5)
-    df = df.set_index(pd.DatetimeIndex(df.time).tz_localize("UTC"))[["open", "high", "low", "close"]]
+    t = pd.DatetimeIndex(pd.to_datetime(df.t, format="%Y%m%d %H%M%S"))
+    df.index = t.tz_localize("America/New_York", ambiguous="NaT", nonexistent="NaT")
+    df = df[df.index.notna()].tz_convert("UTC")[["open", "high", "low", "close"]]
     df = df[~df.index.duplicated()].sort_index()
     df.to_parquet(f"{OUT}/{pair}.parquet"); print(pair, len(df), df.index[0], df.index[-1], df.close.iloc[-1], flush=True)
 def binance(sym):

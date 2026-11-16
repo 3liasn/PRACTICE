@@ -9,7 +9,7 @@ COST = dict(XAUUSD=3e-4, XAGUSD=6e-4, NSXUSD=2e-4, SPXUSD=2e-4, GRXEUR=2.5e-4, J
             EURCAD=2.4e-4, GBPCAD=2.8e-4, EURAUD=2.4e-4, NZDCAD=4.0e-4)
 # Swap anual aproximado (fracción del nocional por año) para (largo, corto); negativo = pago.
 # Oro/índices de especificaciones.json del servidor FTMO; cripto conservador.
-SWAP = dict(XAUUSD=(-0.06, -0.004), XAGUSD=(-0.06, -0.01), NSXUSD=(-0.09, 0.0), SPXUSD=(-0.09, 0.0),
+SWAP = dict(XAUUSD=(-0.06, -0.004), XAGUSD=(-0.10, -0.01), NSXUSD=(-0.09, 0.0), SPXUSD=(-0.09, 0.0),
             GRXEUR=(-0.06, 0.0), JPXJPY=(-0.04, -0.01), WTIUSD=(-0.06, -0.02), EURUSD=(-0.02, -0.01),
             GBPUSD=(-0.02, -0.01), USDJPY=(0.0, -0.05), AUDUSD=(-0.02, -0.02), BTCUSDT=(-0.25, -0.25), ETHUSDT=(-0.25, -0.25),
             **{k: (-0.02, -0.02) for k in ['EURGBP','EURCHF','AUDNZD','AUDCAD','GBPCHF','USDCHF','USDCAD','EURCAD','GBPCAD','EURAUD','NZDCAD']})
@@ -49,7 +49,9 @@ def bar_pnl(close, pos, sym):
     newday[1:] = key[1:] != key[:-1]
     sl, ss = SWAP[sym]
     mult = np.ones(len(c)); wd = ny.dayofweek.values
-    mult[(wd == 2) & newday] = 3 if sym not in ("NSXUSD", "SPXUSD", "GRXEUR", "JPXJPY", "BTCUSDT", "ETHUSDT") else 1
+    idx_cfd = sym in ("NSXUSD", "SPXUSD", "GRXEUR", "JPXJPY")
+    if sym not in ("BTCUSDT", "ETHUSDT"):  # triple swap: miércoles en FX/metales, viernes en índices (rollover3days=5)
+        mult[((wd == 4) if idx_cfd else (wd == 2)) & newday] = 3
     sw = np.where(held > 0, held * sl / 360, np.abs(held) * ss / 360)
     pnl += np.where(newday, sw * mult, 0)
     return pd.Series(pnl, index=close.index)

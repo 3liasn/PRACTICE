@@ -41,20 +41,18 @@ def split(p, cut="2022-01-01"):
     d = daily(p)
     return d[d.index < cut], d[d.index >= cut]
 def ibs(sym, thr=0.2, notional=1.0, close_min=15 * 60 + 55):
-    """Reversión IBS en índices USA: compra al cierre (15:55 NY) si IBS<thr; vende al cierre siguiente
-    o cuando el cierre supera el máximo de ayer. Riesgo: nocional fijo / vol objetivo 10 %."""
+    """Reversión IBS en índices USA: señal con barras M5 hasta las 15:55 NY, se ejecuta al cierre de la barra
+    de las 15:55 (16:00, 5 min de retraso); sale al cierre del día siguiente. Tamaño: vol objetivo 10 %."""
     m5 = load(sym, "5min"); ny = m5.index.tz_convert("America/New_York")
     mins = ny.hour * 60 + ny.minute
-    rth = (mins >= 9 * 60 + 30) & (mins <= close_min)
+    rth = (mins >= 9 * 60 + 30) & (mins < close_min)
     g = m5[rth].groupby(ny[rth].date)
     d = pd.DataFrame({"h": g.high.max(), "l": g.low.min(), "c": g.close.last()})
     d["ibs"] = (d.c - d.l) / (d.h - d.l)
     vol = d.c.pct_change().rolling(40).std() * np.sqrt(252)
     st = 0; pos = []
     for i in range(len(d)):
-        if st and d.c.iloc[i] > d.h.iloc[i - 1]: st = 0
-        elif st: st = 0  # sale al cierre siguiente en cualquier caso
-        if d.ibs.iloc[i] < thr: st = 1
+        st = 1 if d.ibs.iloc[i] < thr else 0
         pos.append(st)
     sz = (0.10 / vol).clip(upper=3).fillna(0) * notional
     dp = pd.Series(np.array(pos) * sz.values, index=pd.to_datetime(d.index).tz_localize("America/New_York") + pd.Timedelta(minutes=close_min)).tz_convert("UTC")

@@ -15,9 +15,10 @@ for s in ["XAUUSD", "NSXUSD", "BTCUSDT", "ETHUSDT", "SPXUSD", "GRXEUR", "XAGUSD"
     cands[f"tsmomL_{s}"] = lambda s=s: S.tsmom(s, long_only=True)
 for s in ["SPXUSD", "NSXUSD", "GRXEUR"]:
     cands[f"ibs_{s}"] = lambda s=s: S.ibs(s)
-D = {}; rows = []
+D = {}; B = {}; rows = []
 for nm, f in cands.items():
-    d = daily(f()); D[nm] = d
+    bp = f(); B[nm] = bp.resample("5min").sum()
+    d = daily(bp); D[nm] = d
     a, b = d[d.index < CUT], d[d.index >= CUT]
     if "USDT" in nm: a = a[a.index >= "2018-01-01"]
     rows.append(dict(name=nm, sh_IS=stats(a)["sharpe_m"], sh_OOS=stats(b)["sharpe_m"]))
@@ -35,10 +36,13 @@ A = pd.DataFrame({k: D[k].act for k in sel}).reindex(idx).fillna(False)
 isP = P[P.index < CUT]
 volIS = isP.apply(lambda x: x[x != 0].std() * np.sqrt(len(x[x != 0]) / 6) if (x != 0).any() else np.nan)
 wts = (1 / volIS); wts = wts / wts.sum()
-port = (P * wts).sum(axis=1); low = (L * wts).sum(axis=1)  # suma de peores flotantes: conservador
+port = (P * wts).sum(axis=1)
 vol_is = port[port.index < CUT].groupby(port[port.index < CUT].index.to_period("M")).sum().std() * np.sqrt(12)
 sc = 0.10 / vol_is
-out = pd.DataFrame({"pnl": port * sc, "low": low * sc, "act": A.any(axis=1)})
+# flotante combinado real: suma ponderada del P&L de todas las mangas en barras de 5 min, luego día de Praga
+bars = pd.DataFrame({k: B[k] for k in sel}).fillna(0)
+cd = daily((bars * wts).sum(axis=1) * sc).reindex(idx).fillna(0)
+out = pd.DataFrame({"pnl": cd.pnl, "low": cd.low, "act": A.any(axis=1)})
 out = out[out.index.dayofweek < 7]
 out.to_parquet("/home/user/data2/port_daily.parquet")
 show([stats(out[out.index < CUT], "cartera IS"), stats(out[out.index >= CUT], "cartera OOS")])
